@@ -1,0 +1,64 @@
+name: Deploy Frontend (Password Auth)
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout Code
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # 2. Install Flutter
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      # 3. Install Dependencies
+      - name: Flutter Pub Get
+        run: flutter pub get
+
+      # 4. Analyze Code (Optional but recommended)
+      - name: Analyze Code
+        run: flutter analyze
+
+      # 5. Build Web in Release Mode
+      - name: Build Web Release
+        run: flutter build web --release --no-tree-shake-icons
+
+      # 6. Copy Files via SCP (Password)
+      - name: Deploy to Server via SCP
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: 22
+          # SOURCE: We only want the files *inside* the build/web folder
+          source: "build/web/*"
+          # TARGET: The folder on your server where the frontend lives
+          # CHANGE THIS to your actual frontend path
+          target: "/home/ubuntu/Public/apps/AryaMehta/portfolio/" 
+          # strip_components: 2 removes 'build/web' from the path so files go directly into the target
+          strip_components: 2 
+
+      # 7. (Optional) Run Post-Deploy Script via SSH
+      # Use this if you need to fix permissions or restart Nginx
+      - name: Post-Deploy Steps
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: 22
+          script: |
+            echo "✅ Frontend files uploaded."
+            # Example: Fix permissions if needed
+            # sudo chown -R www-data:www-data /home/ubuntu/Public/apps/AryaMehta/frontend/
+            # sudo systemctl reload nginx
